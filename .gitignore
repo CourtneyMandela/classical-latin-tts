@@ -1,0 +1,9 @@
+.env
+data/*.pls
+data/*.wav
+data/*.mp3
+*.mp3
+*.wav
+__pycache__/
+*.pyc
+.venv/

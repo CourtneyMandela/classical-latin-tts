@@ -1,0 +1,4 @@
+elevenlabs>=1.0.0
+cltk>=1.4.0
+python-dotenv>=1.0.0
+ffmpeg-normalize>=1.29.0
