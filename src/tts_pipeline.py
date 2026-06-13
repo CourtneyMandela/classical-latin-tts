@@ -68,7 +68,28 @@ def _rewrite_latin(text: str) -> str:
     # 6. j/J → y/Y
     t = re.sub(r'[Jj]', lambda m: 'Y' if m.group().isupper() else 'y', t)
 
+    # 7. Fix swallowed final consonant clusters — model elides -st/-xt endings.
+    #    Doubling the preceding vowel forces the cluster to be articulated.
+    _CLUSTER_FIXES = [
+        # word  → rewrite   (whole-word matches only)
+        (r'\best\b',  'esst'),
+        (r'\bEst\b',  'Esst'),
+        (r'\bEST\b',  'ESST'),
+        (r'\bpost\b', 'posst'),
+        (r'\bPost\b', 'Posst'),
+        (r'\bPOST\b', 'POSST'),
+    ]
+    for pattern, replacement in _CLUSTER_FIXES:
+        t = re.sub(pattern, replacement, t)
+
     return t
+
+
+def _to_ssml(text: str, speed: float) -> str:
+    """Wrap text in an SSML prosody envelope to lock the speech rate."""
+    escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    rate = int(round(speed * 100))
+    return f'<speak><prosody rate="{rate}%">{escaped}</prosody></speak>'
 
 
 _MAX_CHARS = 4500  # ElevenLabs hard limit is ~5000; stay under it
@@ -106,12 +127,12 @@ def _split_chunks(text: str) -> list[str]:
 def _synthesize_chunk(client: ElevenLabs, chunk: str, config: dict, speed: float) -> bytes:
     audio = client.text_to_speech.convert(
         voice_id=config["voice_id"],
-        text=chunk,
+        text=_to_ssml(chunk, speed),  # SSML prosody locks rate more reliably than speed param alone
         model_id=config["model_id"],
         voice_settings=VoiceSettings(
-            stability=0.80,        # high = consistent volume/pacing (low = expressive but shouts)
+            stability=0.85,
             similarity_boost=0.75,
-            style=0.0,             # no style exaggeration
+            style=0.0,
             use_speaker_boost=True,
             speed=speed,
         ),
