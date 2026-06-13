@@ -34,7 +34,7 @@ def upload_voice(audio_dir: str, voice_name: str, description: str) -> None:
     client = ElevenLabs(api_key=api_key)
     file_handles = [open(f, "rb") for f in audio_files]
     try:
-        voice = client.voices.add(
+        voice = client.voices.ivc.create(
             name=voice_name,
             files=file_handles,
             description=description,
