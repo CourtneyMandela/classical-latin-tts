@@ -71,17 +71,36 @@ def _rewrite_latin(text: str) -> str:
     return t
 
 
+_MAX_CHARS = 4500  # ElevenLabs hard limit is ~5000; stay under it
+
+
 def _split_chunks(text: str) -> list[str]:
-    """Split on sentence boundaries; further split long clauses at commas."""
-    parts = re.split(r"(?<=[.?!])\s+", text.strip())
-    chunks = []
-    for part in parts:
-        if len(part) > 80:
-            sub = re.split(r"(?<=[,;])\s+", part)
-            chunks.extend(sub)
+    """Split at paragraph then sentence boundaries to stay under the char limit."""
+    if len(text) <= _MAX_CHARS:
+        return [text]
+
+    # Try paragraph breaks first
+    paragraphs = re.split(r"\n\s*\n", text.strip())
+    chunks: list[str] = []
+    for para in paragraphs:
+        para = para.strip()
+        if not para:
+            continue
+        if len(para) <= _MAX_CHARS:
+            chunks.append(para)
         else:
-            chunks.append(part)
-    return [c.strip() for c in chunks if c.strip()]
+            # Fall back to sentence splitting for very long paragraphs
+            sentences = re.split(r"(?<=[.?!])\s+", para)
+            current = ""
+            for sent in sentences:
+                if current and len(current) + 1 + len(sent) > _MAX_CHARS:
+                    chunks.append(current.strip())
+                    current = sent
+                else:
+                    current = (current + " " + sent).strip() if current else sent
+            if current:
+                chunks.append(current.strip())
+    return [c for c in chunks if c]
 
 
 def _synthesize_chunk(client: ElevenLabs, chunk: str, config: dict, speed: float) -> bytes:
@@ -108,7 +127,7 @@ def latin_to_speech(text: str, output_path: str, speed: float = 0.85) -> None:
 
     audio_parts = []
     for i, chunk in enumerate(chunks, 1):
-        print(f"  [{i}/{len(chunks)}] {chunk}")
+        print(f"  [{i}/{len(chunks)}] synthesizing {len(chunk)} chars...")
         audio_parts.append(_synthesize_chunk(client, chunk, config, speed))
 
     out = Path(output_path)
