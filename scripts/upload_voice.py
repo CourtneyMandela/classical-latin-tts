@@ -17,7 +17,7 @@ from elevenlabs.client import ElevenLabs
 
 # ElevenLabs IVC limits
 _MAX_FILES = 25
-_CLIP_DURATION = 120  # seconds — 2 min per clip, well within 11 MB limit
+_CLIP_DURATION = 90   # seconds — 1.5 min per clip; 25×1.5=37.5 min total < 45 min limit
 _CLIP_START = 30      # skip first 30s (often intro/silence)
 
 
