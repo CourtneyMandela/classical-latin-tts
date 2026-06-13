@@ -2,10 +2,8 @@
 
 Requires .env with:
   ELEVENLABS_API_KEY
-  VOICE_ID              — from upload_voice.py
-  PRONUNCIATION_DICT_ID — optional, from upload_pronunciation_dict.py
-  PRONUNCIATION_DICT_VERSION_ID — optional
-  ELEVENLABS_MODEL      — optional, default: eleven_multilingual_v2
+  VOICE_ID         — from upload_voice.py
+  ELEVENLABS_MODEL — optional, default: eleven_multilingual_v2
 """
 
 import os
@@ -15,7 +13,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
-from elevenlabs.types import PronunciationDictionaryVersionLocator, VoiceSettings
+from elevenlabs.types import VoiceSettings
 
 
 def _load_config() -> dict:
@@ -23,12 +21,9 @@ def _load_config() -> dict:
     config = {
         "api_key": os.environ.get("ELEVENLABS_API_KEY", ""),
         "voice_id": os.environ.get("VOICE_ID", ""),
-        "dict_id": os.environ.get("PRONUNCIATION_DICT_ID", ""),
-        "dict_version_id": os.environ.get("PRONUNCIATION_DICT_VERSION_ID", ""),
         "model_id": os.environ.get("ELEVENLABS_MODEL", "eleven_multilingual_v2"),
     }
-    required = ["api_key", "voice_id"]
-    missing = [k.upper() for k in required if not config[k]]
+    missing = [k.upper() for k in ("api_key", "voice_id") if not config[k]]
     if missing:
         raise EnvironmentError(
             f"Missing required environment variables: {', '.join(missing)}\n"
@@ -37,22 +32,51 @@ def _load_config() -> dict:
     return config
 
 
-def _strip_macrons(text: str) -> str:
-    """Remove macrons/diacritics (ā→a, ē→e …) so ElevenLabs doesn't skip words."""
-    return "".join(
-        c for c in unicodedata.normalize("NFD", text)
-        if unicodedata.category(c) != "Mn"
-    )
+# ── Classical Latin text pre-processor ───────────────────────────────────────
+# Rewrites Latin text so ElevenLabs pronounces it correctly without needing
+# a pronunciation dictionary (which breaks IVC voices).
+
+_MACRON_MAP = str.maketrans("āēīōūĀĒĪŌŪ", "aeiouAEIOU")
+
+# Diphthong rewrites must run before single-vowel rules.
+_DIPHTHONG_MAP = [
+    ("ae", "ai"),
+    ("Ae", "Ai"),
+    ("AE", "AI"),
+    ("oe", "oi"),
+    ("Oe", "Oi"),
+]
+
+def _rewrite_latin(text: str) -> str:
+    """Rewrite Latin text for correct Classical pronunciation by ElevenLabs."""
+    # 1. Strip macrons
+    t = text.translate(_MACRON_MAP)
+
+    # 2. Diphthongs (ae→ai, oe→oi)
+    for src, dst in _DIPHTHONG_MAP:
+        t = t.replace(src, dst)
+
+    # 3. qu → kw (must come before c→k rule)
+    t = re.sub(r'[Qq]u', lambda m: 'Kw' if m.group()[0].isupper() else 'kw', t)
+
+    # 4. c/C → k/K always (Classical Latin c is always /k/)
+    t = re.sub(r'[Cc]', lambda m: 'K' if m.group().isupper() else 'k', t)
+
+    # 5. v/V → w/W (consonantal; Classical Latin v is /w/)
+    t = re.sub(r'[Vv]', lambda m: 'W' if m.group().isupper() else 'w', t)
+
+    # 6. j/J → y/Y
+    t = re.sub(r'[Jj]', lambda m: 'Y' if m.group().isupper() else 'y', t)
+
+    return t
 
 
-def _split_sentences(text: str) -> list[str]:
-    """Split on sentence-ending punctuation and commas to keep chunks short."""
-    # First split on sentence boundaries
+def _split_chunks(text: str) -> list[str]:
+    """Split on sentence boundaries; further split long clauses at commas."""
     parts = re.split(r"(?<=[.?!])\s+", text.strip())
-    # Then split any long clause further at commas/semicolons
     chunks = []
     for part in parts:
-        if len(part) > 60:
+        if len(part) > 80:
             sub = re.split(r"(?<=[,;])\s+", part)
             chunks.extend(sub)
         else:
@@ -60,25 +84,17 @@ def _split_sentences(text: str) -> list[str]:
     return [c.strip() for c in chunks if c.strip()]
 
 
-def _synthesize_sentence(client: ElevenLabs, sentence: str, config: dict, speed: float) -> bytes:
-    kwargs = {
-        "voice_id": config["voice_id"],
-        "text": sentence,
-        "model_id": config["model_id"],
-        "voice_settings": VoiceSettings(
+def _synthesize_chunk(client: ElevenLabs, chunk: str, config: dict, speed: float) -> bytes:
+    audio = client.text_to_speech.convert(
+        voice_id=config["voice_id"],
+        text=chunk,
+        model_id=config["model_id"],
+        voice_settings=VoiceSettings(
             stability=0.5,
             similarity_boost=0.8,
             speed=speed,
         ),
-    }
-    if config["dict_id"]:
-        locator = PronunciationDictionaryVersionLocator(
-            pronunciation_dictionary_id=config["dict_id"],
-            version_id=config["dict_version_id"] or None,
-        )
-        kwargs["pronunciation_dictionary_locators"] = [locator]
-
-    audio = client.text_to_speech.convert(**kwargs)
+    )
     return b"".join(audio)
 
 
@@ -87,15 +103,13 @@ def latin_to_speech(text: str, output_path: str, speed: float = 0.85) -> None:
     config = _load_config()
     client = ElevenLabs(api_key=config["api_key"])
 
-    # Strip macrons — ElevenLabs skips/garbles macronized Unicode
-    clean_text = _strip_macrons(text)
+    rewritten = _rewrite_latin(text)
+    chunks = _split_chunks(rewritten)
 
-    # Synthesize sentence by sentence to prevent word-skipping
-    sentences = _split_sentences(clean_text)
     audio_parts = []
-    for i, sentence in enumerate(sentences, 1):
-        print(f"  Synthesizing sentence {i}/{len(sentences)}: {sentence[:60]}...")
-        audio_parts.append(_synthesize_sentence(client, sentence, config, speed))
+    for i, chunk in enumerate(chunks, 1):
+        print(f"  [{i}/{len(chunks)}] {chunk}")
+        audio_parts.append(_synthesize_chunk(client, chunk, config, speed))
 
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -103,5 +117,4 @@ def latin_to_speech(text: str, output_path: str, speed: float = 0.85) -> None:
         for part in audio_parts:
             f.write(part)
 
-    label = "with pronunciation dictionary" if config["dict_id"] else "no pronunciation dictionary"
-    print(f"Saved: {output_path} ({label})")
+    print(f"Saved: {output_path}")
