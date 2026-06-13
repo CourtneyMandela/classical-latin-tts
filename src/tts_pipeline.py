@@ -109,8 +109,10 @@ def _synthesize_chunk(client: ElevenLabs, chunk: str, config: dict, speed: float
         text=chunk,
         model_id=config["model_id"],
         voice_settings=VoiceSettings(
-            stability=0.5,
-            similarity_boost=0.8,
+            stability=0.80,        # high = consistent volume/pacing (low = expressive but shouts)
+            similarity_boost=0.75,
+            style=0.0,             # no style exaggeration
+            use_speaker_boost=True,
             speed=speed,
         ),
     )
