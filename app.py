@@ -114,7 +114,7 @@ def generate_sample(sections, speed):
     return tmp.name
 
 
-def generate_all(sections, speed, progress=gr.Progress()):
+def generate_all(sections, speed):
     """Synthesize all sections and package them into a ZIP."""
     if not sections:
         return [], None
@@ -123,7 +123,9 @@ def generate_all(sections, speed, progress=gr.Progress()):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     file_paths = []
-    for i, section in enumerate(progress.tqdm(sections, desc="Generating audio"), 1):
+    total = len(sections)
+    for i, section in enumerate(sections, 1):
+        print(f"[{i}/{total}] {section.title}")
         safe_title = _sanitize_filename(section.title)
         filename = f"{i:02d}_{safe_title}.mp3"
         out_path = out_dir / filename
