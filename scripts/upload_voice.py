@@ -34,7 +34,10 @@ def _extract_clip(src: Path, dest: Path) -> bool:
         ],
         capture_output=True,
     )
-    return result.returncode == 0
+    # Reject clips under 100 KB — file was too short or extraction failed
+    if result.returncode != 0 or not dest.exists() or dest.stat().st_size < 100_000:
+        return False
+    return True
 
 
 def upload_voice(audio_dir: str, voice_name: str, description: str) -> None:
