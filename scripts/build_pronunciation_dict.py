@@ -434,27 +434,65 @@ CORE_LATIN_WORDS: list[str] = [
 ]
 
 
+_DIPHTHONGS = {"ae": "ae̯", "oe": "oe̯", "au": "au̯", "eu": "eu̯", "ei": "ei̯"}
+_DIGRAPHS = {"qu": "kʷ", "ph": "pʰ", "ch": "kʰ", "th": "tʰ", "gn": "ŋn"}
+_LONG_VOWELS = {"ā": "aː", "ē": "eː", "ī": "iː", "ō": "oː", "ū": "uː"}
+_SHORT_VOWELS = {"a": "a", "e": "ɛ", "i": "ɪ", "o": "ɔ", "u": "ʊ", "y": "ʏ"}
+_CONSONANTS = {
+    "b": "b", "d": "d", "f": "f", "g": "ɡ", "h": "h", "k": "k",
+    "l": "l", "m": "m", "n": "n", "p": "p", "r": "r", "s": "s", "t": "t",
+    "v": "w", "j": "j", "x": "ks", "z": "dz",
+}
+
+
+def _builtin_transcribe(word: str) -> str:
+    """Rule-based Classical Latin IPA transcription (Allen/Vox Latina conventions)."""
+    w = word.lower()
+    out = []
+    i = 0
+    while i < len(w):
+        two = w[i:i + 2]
+        ch = w[i]
+        if two in _DIPHTHONGS:
+            out.append(_DIPHTHONGS[two])
+            i += 2
+        elif two in _DIGRAPHS:
+            out.append(_DIGRAPHS[two])
+            i += 2
+        elif ch in _LONG_VOWELS:
+            out.append(_LONG_VOWELS[ch])
+            i += 1
+        elif ch in _SHORT_VOWELS:
+            out.append(_SHORT_VOWELS[ch])
+            i += 1
+        elif ch in _CONSONANTS:
+            out.append(_CONSONANTS[ch])
+            i += 1
+        else:
+            out.append(ch)
+            i += 1
+    return "".join(out)
+
+
 def transcribe_word(transcriber, word: str) -> str | None:
-    """Return IPA for a Latin word, or None if transcription fails."""
-    try:
-        raw = transcriber.transcribe(word)
-        if raw and raw.strip():
-            # CLTK 2.x wraps output in [] — strip them
-            return raw.strip().strip("[]")
-    except Exception:
-        pass
-    return None
+    """Return IPA for a Latin word using CLTK if available, else built-in rules."""
+    if transcriber is not None:
+        try:
+            raw = transcriber.transcribe(word)
+            if raw and raw.strip():
+                return raw.strip().strip("[]")
+        except Exception:
+            pass
+    return _builtin_transcribe(word) or None
 
 
 def _load_transcriber():
-    """Return a CLTK transcriber (2.x or 1.x) or None."""
-    # CLTK 2.x
+    """Return a CLTK transcriber (1.x or 2.x) or None."""
     try:
         from cltk.phonology.lat.phonology import LatinTranscription
         return LatinTranscription()
     except Exception:
         pass
-    # CLTK 1.x
     try:
         from cltk.phonology.lat.transcription import Transcriber
         return Transcriber(dialect="Classical", reconstruction="Allen")
@@ -465,13 +503,11 @@ def _load_transcriber():
 
 def build_pls(words: list[str], output_path: str) -> None:
     transcriber = _load_transcriber()
-    use_cltk = transcriber is not None
-    if not use_cltk:
-        print(
-            "Warning: cltk transcriber unavailable — dictionary will contain only manually curated entries.\n"
-            "Run: pip install cltk",
-            file=sys.stderr,
-        )
+    if transcriber is not None:
+        print("Using CLTK transcriber.", file=sys.stderr)
+    else:
+        print("CLTK transcriber unavailable — using built-in rule-based transcription.", file=sys.stderr)
+    use_cltk = True  # transcribe_word always produces output via built-in fallback
 
     root = ET.Element("lexicon")
     root.set("version", "1.0")
