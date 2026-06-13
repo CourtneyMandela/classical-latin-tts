@@ -466,6 +466,14 @@ def build_pls(words: list[str], output_path: str) -> None:
         )
         use_cltk = False
         transcriber = None
+    except Exception as e:
+        print(
+            f"Warning: cltk model data unavailable ({e}) — dictionary will contain only manually curated entries.\n"
+            "Run: python -c \"from cltk.data.fetch import FetchCorpus; c=FetchCorpus('lat'); c.import_corpus('lat_models_cltk')\"",
+            file=sys.stderr,
+        )
+        use_cltk = False
+        transcriber = None
 
     root = ET.Element("lexicon")
     root.set("version", "1.0")
