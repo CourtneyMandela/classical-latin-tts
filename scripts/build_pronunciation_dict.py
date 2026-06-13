@@ -315,6 +315,7 @@ CORE_LATIN_WORDS: list[str] = [
     "voluntas", "voluntatis", "voluntatem",
     "potestas", "potestatis", "potestatem",
     "senatus", "senatui", "senatum",
+    "exerceo", "exerces", "exercet", "exercemus", "exercetis", "exercent", "exercere", "exercui",
     "exercitus", "exercitui", "exercitum",
     "manus", "manui", "manum", "manibus",
     "dies", "diei", "diem", "diebus",

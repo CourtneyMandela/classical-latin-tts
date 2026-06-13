@@ -46,9 +46,18 @@ def _strip_macrons(text: str) -> str:
 
 
 def _split_sentences(text: str) -> list[str]:
-    """Split on sentence-ending punctuation, keeping the punctuation."""
+    """Split on sentence-ending punctuation and commas to keep chunks short."""
+    # First split on sentence boundaries
     parts = re.split(r"(?<=[.?!])\s+", text.strip())
-    return [p.strip() for p in parts if p.strip()]
+    # Then split any long clause further at commas/semicolons
+    chunks = []
+    for part in parts:
+        if len(part) > 60:
+            sub = re.split(r"(?<=[,;])\s+", part)
+            chunks.extend(sub)
+        else:
+            chunks.append(part)
+    return [c.strip() for c in chunks if c.strip()]
 
 
 def _synthesize_sentence(client: ElevenLabs, sentence: str, config: dict, speed: float) -> bytes:
