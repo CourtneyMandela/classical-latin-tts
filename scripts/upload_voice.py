@@ -8,10 +8,33 @@ from the uploaded audio. Prints the resulting voice_id for use in .env.
 import os
 import sys
 import argparse
+import subprocess
+import tempfile
 from pathlib import Path
 
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
+
+# ElevenLabs IVC limits
+_MAX_FILES = 25
+_CLIP_DURATION = 120  # seconds — 2 min per clip, well within 11 MB limit
+_CLIP_START = 30      # skip first 30s (often intro/silence)
+
+
+def _extract_clip(src: Path, dest: Path) -> bool:
+    """Extract a 2-minute MP3 clip from src, starting at 30s."""
+    result = subprocess.run(
+        [
+            "ffmpeg", "-y", "-i", str(src),
+            "-ss", str(_CLIP_START),
+            "-t", str(_CLIP_DURATION),
+            "-ac", "1", "-ar", "44100",
+            "-codec:a", "libmp3lame", "-b:a", "128k",
+            str(dest),
+        ],
+        capture_output=True,
+    )
+    return result.returncode == 0
 
 
 def upload_voice(audio_dir: str, voice_name: str, description: str) -> None:
@@ -29,27 +52,41 @@ def upload_voice(audio_dir: str, voice_name: str, description: str) -> None:
         print(f"No audio files found in {audio_dir}", file=sys.stderr)
         sys.exit(1)
 
-    # ElevenLabs IVC accepts a maximum of 25 files
-    max_files = 25
-    if len(audio_files) > max_files:
+    # Select up to 25 evenly-spaced files
+    if len(audio_files) > _MAX_FILES:
         total = len(audio_files)
-        step = total / max_files
-        audio_files = [audio_files[int(i * step)] for i in range(max_files)]
-        print(f"Selecting {max_files} evenly-spaced files from {total} total...")
+        step = total / _MAX_FILES
+        audio_files = [audio_files[int(i * step)] for i in range(_MAX_FILES)]
+        print(f"Selected {_MAX_FILES} evenly-spaced files from {total} total.")
 
-    print(f"Uploading {len(audio_files)} file(s) as IVC voice '{voice_name}'...")
+    print(f"Extracting {_CLIP_DURATION}s clips and uploading as IVC voice '{voice_name}'...")
 
     client = ElevenLabs(api_key=api_key)
-    file_handles = [open(f, "rb") for f in audio_files]
-    try:
-        voice = client.voices.ivc.create(
-            name=voice_name,
-            files=file_handles,
-            description=description,
-        )
-    finally:
-        for fh in file_handles:
-            fh.close()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        clips = []
+        for i, src in enumerate(audio_files):
+            clip = Path(tmpdir) / f"clip_{i:03d}.mp3"
+            if _extract_clip(src, clip):
+                clips.append(clip)
+            else:
+                print(f"  Warning: could not extract clip from {src.name}, skipping.")
+
+        if not clips:
+            print("Error: no clips could be extracted.", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"Uploading {len(clips)} clip(s)...")
+        file_handles = [open(c, "rb") for c in clips]
+        try:
+            voice = client.voices.ivc.create(
+                name=voice_name,
+                files=file_handles,
+                description=description,
+            )
+        finally:
+            for fh in file_handles:
+                fh.close()
 
     print(f"\nVoice created successfully.")
     print(f"Voice ID: {voice.voice_id}")
