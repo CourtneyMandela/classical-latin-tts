@@ -3,8 +3,8 @@
 Requires .env with:
   ELEVENLABS_API_KEY
   VOICE_ID              — from upload_voice.py
-  PRONUNCIATION_DICT_ID — from upload_pronunciation_dict.py
-  PRONUNCIATION_DICT_VERSION_ID — from upload_pronunciation_dict.py
+  PRONUNCIATION_DICT_ID — optional, from upload_pronunciation_dict.py
+  PRONUNCIATION_DICT_VERSION_ID — optional
   ELEVENLABS_MODEL      — optional, default: eleven_multilingual_v2
 """
 
@@ -24,7 +24,7 @@ def _load_config() -> dict:
         "dict_version_id": os.environ.get("PRONUNCIATION_DICT_VERSION_ID", ""),
         "model_id": os.environ.get("ELEVENLABS_MODEL", "eleven_multilingual_v2"),
     }
-    required = ["api_key", "voice_id", "dict_id"]
+    required = ["api_key", "voice_id"]
     missing = [k.upper() for k in required if not config[k]]
     if missing:
         raise EnvironmentError(
@@ -35,20 +35,23 @@ def _load_config() -> dict:
 
 
 def latin_to_speech(text: str, output_path: str) -> None:
-    """Synthesize Latin text to an MP3 file using the cloned voice + pronunciation dictionary."""
+    """Synthesize Latin text to an MP3 file using the cloned voice."""
     config = _load_config()
     client = ElevenLabs(api_key=config["api_key"])
 
-    locator: dict = {"pronunciation_dictionary_id": config["dict_id"]}
-    if config["dict_version_id"]:
-        locator["version_id"] = config["dict_version_id"]
+    kwargs = {
+        "voice_id": config["voice_id"],
+        "text": text,
+        "model_id": config["model_id"],
+    }
 
-    audio = client.text_to_speech.convert(
-        voice_id=config["voice_id"],
-        text=text,
-        model_id=config["model_id"],
-        pronunciation_dictionary_locators=[locator],
-    )
+    if config["dict_id"]:
+        locator: dict = {"pronunciation_dictionary_id": config["dict_id"]}
+        if config["dict_version_id"]:
+            locator["version_id"] = config["dict_version_id"]
+        kwargs["pronunciation_dictionary_locators"] = [locator]
+
+    audio = client.text_to_speech.convert(**kwargs)
 
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -56,4 +59,7 @@ def latin_to_speech(text: str, output_path: str) -> None:
         for chunk in audio:
             f.write(chunk)
 
-    print(f"Saved: {output_path}")
+    if config["dict_id"]:
+        print(f"Saved: {output_path} (with pronunciation dictionary)")
+    else:
+        print(f"Saved: {output_path} (no pronunciation dictionary — set PRONUNCIATION_DICT_ID in .env to enable)")
