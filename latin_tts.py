@@ -27,6 +27,10 @@ def main() -> None:
     parser.add_argument(
         "--output", "-o", default="output.mp3", metavar="FILE", help="Output MP3 path (default: output.mp3)"
     )
+    parser.add_argument(
+        "--speed", "-s", type=float, default=0.85, metavar="SPEED",
+        help="Speech speed: 1.0=normal, 0.85=slightly slower (default: 0.85)"
+    )
     args = parser.parse_args()
 
     if args.input_file:
@@ -38,7 +42,7 @@ def main() -> None:
         parser.error("No text provided.")
 
     try:
-        latin_to_speech(text, args.output)
+        latin_to_speech(text, args.output, speed=args.speed)
     except EnvironmentError as e:
         print(f"Configuration error:\n{e}", file=sys.stderr)
         sys.exit(1)

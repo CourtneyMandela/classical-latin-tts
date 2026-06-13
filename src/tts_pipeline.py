@@ -9,12 +9,13 @@ Requires .env with:
 """
 
 import os
+import re
 import unicodedata
 from pathlib import Path
 
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
-from elevenlabs.types import PronunciationDictionaryVersionLocator
+from elevenlabs.types import PronunciationDictionaryVersionLocator, VoiceSettings
 
 
 def _load_config() -> dict:
@@ -37,28 +38,30 @@ def _load_config() -> dict:
 
 
 def _strip_macrons(text: str) -> str:
-    """Remove macrons and other diacritics (ā→a, ē→e, etc.) so ElevenLabs doesn't skip words."""
+    """Remove macrons/diacritics (ā→a, ē→e …) so ElevenLabs doesn't skip words."""
     return "".join(
         c for c in unicodedata.normalize("NFD", text)
         if unicodedata.category(c) != "Mn"
     )
 
 
-def latin_to_speech(text: str, output_path: str) -> None:
-    """Synthesize Latin text to an MP3 file using the cloned voice."""
-    config = _load_config()
-    client = ElevenLabs(api_key=config["api_key"])
+def _split_sentences(text: str) -> list[str]:
+    """Split on sentence-ending punctuation, keeping the punctuation."""
+    parts = re.split(r"(?<=[.?!])\s+", text.strip())
+    return [p.strip() for p in parts if p.strip()]
 
-    # Strip macrons — ElevenLabs skips/garbles macronized Unicode; the
-    # pronunciation dictionary handles correct vowel quality via IPA anyway.
-    clean_text = _strip_macrons(text)
 
+def _synthesize_sentence(client: ElevenLabs, sentence: str, config: dict, speed: float) -> bytes:
     kwargs = {
         "voice_id": config["voice_id"],
-        "text": clean_text,
+        "text": sentence,
         "model_id": config["model_id"],
+        "voice_settings": VoiceSettings(
+            stability=0.5,
+            similarity_boost=0.8,
+            speed=speed,
+        ),
     }
-
     if config["dict_id"]:
         locator = PronunciationDictionaryVersionLocator(
             pronunciation_dictionary_id=config["dict_id"],
@@ -67,14 +70,29 @@ def latin_to_speech(text: str, output_path: str) -> None:
         kwargs["pronunciation_dictionary_locators"] = [locator]
 
     audio = client.text_to_speech.convert(**kwargs)
+    return b"".join(audio)
+
+
+def latin_to_speech(text: str, output_path: str, speed: float = 0.85) -> None:
+    """Synthesize Latin text to an MP3 file using the cloned voice."""
+    config = _load_config()
+    client = ElevenLabs(api_key=config["api_key"])
+
+    # Strip macrons — ElevenLabs skips/garbles macronized Unicode
+    clean_text = _strip_macrons(text)
+
+    # Synthesize sentence by sentence to prevent word-skipping
+    sentences = _split_sentences(clean_text)
+    audio_parts = []
+    for i, sentence in enumerate(sentences, 1):
+        print(f"  Synthesizing sentence {i}/{len(sentences)}: {sentence[:60]}...")
+        audio_parts.append(_synthesize_sentence(client, sentence, config, speed))
 
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "wb") as f:
-        for chunk in audio:
-            f.write(chunk)
+        for part in audio_parts:
+            f.write(part)
 
-    if config["dict_id"]:
-        print(f"Saved: {output_path} (with pronunciation dictionary)")
-    else:
-        print(f"Saved: {output_path} (no pronunciation dictionary — set PRONUNCIATION_DICT_ID in .env to enable)")
+    label = "with pronunciation dictionary" if config["dict_id"] else "no pronunciation dictionary"
+    print(f"Saved: {output_path} ({label})")
