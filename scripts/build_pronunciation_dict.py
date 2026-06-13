@@ -19,61 +19,65 @@ import xml.etree.ElementTree as ET
 # Manually curated proper nouns — CLTK's transcriber handles inflected forms
 # but not proper names reliably. IPA follows Allen's Vox Latina conventions.
 PROPER_NOUNS: dict[str, str] = {
-    "Caesar": "ˈkae̯.sar",
-    "caesar": "ˈkae̯.sar",
-    "Cicero": "ˈki.ke.roː",
-    "cicero": "ˈki.ke.roː",
-    "Roma": "ˈroː.ma",
-    "Gallia": "ˈɡal.li.a",
-    "Galli": "ˈɡal.liː",
-    "Gallus": "ˈɡal.lus",
-    "Italia": "iˈta.li.a",
-    "Graecia": "ˈɡrae̯.ki.a",
-    "Hispania": "hisˈpaː.ni.a",
-    "Germania": "ɡerˈmaː.ni.a",
-    "Britannia": "briˈtan.ni.a",
-    "Vergilius": "werˈɡi.li.us",
-    "Horatius": "hoˈraː.ti.us",
-    "Livius": "ˈliː.wi.us",
-    "Tacitus": "ˈta.ki.tus",
-    "Seneca": "ˈse.ne.ka",
-    "Plautus": "ˈplau̯.tus",
-    "Terentius": "teˈren.ti.us",
-    "Ovidius": "oˈwiː.di.us",
-    "Marcus": "ˈmar.kus",
-    "Gaius": "ˈɡae̯.i.us",
-    "Lucius": "ˈluː.ki.us",
-    "Titus": "ˈtiː.tus",
-    "Publius": "ˈpuː.bli.us",
-    "Quintus": "ˈkwin.tus",
-    "Gnaeus": "ˈɡnae̯.us",
-    "Aeneas": "ae̯ˈneː.as",
-    "Troia": "ˈtroj.ja",
-    "Carthago": "karˈthaː.ɡoː",
-    "Pompeius": "pomˈpej.jus",
-    "Antonius": "anˈtoː.ni.us",
-    "Brutus": "ˈbruː.tus",
-    "Augustus": "au̯ˈɡus.tus",
-    "Romulus": "ˈroː.mu.lus",
-    "Remus": "ˈreː.mus",
-    "Iulius": "ˈjuː.li.us",
-    "Iulia": "ˈjuː.li.a",
+    # ASCII-only IPA: no combining chars, stress marks, or length marks.
+    # Key corrections: c→k, ae→ai, v→w, g always hard.
+    "Caesar": "kaisar",
+    "caesar": "kaisar",
+    "Cicero": "kikero",
+    "cicero": "kikero",
+    "Roma": "roma",
+    "Gallia": "gallia",
+    "Galli": "galli",
+    "Gallus": "gallus",
+    "Italia": "italia",
+    "Graecia": "graikia",
+    "Hispania": "hispania",
+    "Germania": "germania",
+    "Britannia": "britannia",
+    "Vergilius": "wergilius",
+    "Horatius": "horatius",
+    "Livius": "liwius",
+    "Tacitus": "takitus",
+    "Seneca": "seneka",
+    "Plautus": "plawtus",
+    "Terentius": "terentius",
+    "Ovidius": "owidius",
+    "Marcus": "markus",
+    "Gaius": "gaius",
+    "Lucius": "lukius",
+    "Titus": "titus",
+    "Publius": "publius",
+    "Quintus": "kwintus",
+    "Gnaeus": "gnaeus",
+    "Aeneas": "aineas",
+    "Troia": "troja",
+    "Carthago": "kartago",
+    "Pompeius": "pompeius",
+    "Antonius": "antonius",
+    "Brutus": "brutus",
+    "Augustus": "awgustus",
+    "Romulus": "romulus",
+    "Remus": "remus",
+    "Iulius": "julius",
+    "Iulia": "julia",
     # Familia Romana characters
-    "Medus": "ˈmeː.dus",
-    "Lydia": "ˈly.di.a",
-    "Davus": "ˈdaː.wus",
-    "Syrus": "ˈsy.rus",
+    "Medus": "medus",
+    "Lydia": "lydia",
+    "Davus": "dawus",
+    "Syrus": "syrus",
+    "Tiberius": "tiberius",
+    "Cornelia": "kornelia",
+    "Quintus": "kwintus",
+    "Flavia": "flawia",
     # Common geographic
-    "Rhenus": "ˈreː.nus",
-    "Danuvius": "daˈnuː.wi.us",
-    "Padus": "ˈpaː.dus",
-    "Rubicon": "ˈru.bi.koːn",
-    "Alpes": "ˈal.peːs",
-    "Apenninus": "a.penˈniː.nus",
-    "Sicilia": "siˈki.li.a",
-    "Aegyptus": "ae̯ˈɡyp.tus",
-    "Athena": "aˈtʰeː.nae̯",
-    "Athenae": "aˈtʰeː.nae̯",
+    "Rhenus": "renus",
+    "Danuvius": "danuwius",
+    "Padus": "padus",
+    "Rubicon": "rubikon",
+    "Alpes": "alpes",
+    "Sicilia": "sikilia",
+    "Aegyptus": "aigyptus",
+    "Athenae": "athenai",
 }
 
 
@@ -438,14 +442,17 @@ CORE_LATIN_WORDS: list[str] = [
 ]
 
 
-_DIPHTHONGS = {"ae": "ae̯", "oe": "oe̯", "au": "au̯", "eu": "eu̯", "ei": "ei̯"}
-_DIGRAPHS = {"qu": "kʷ", "ph": "pʰ", "ch": "kʰ", "th": "tʰ", "gn": "ŋn"}
-_LONG_VOWELS = {"ā": "aː", "ē": "eː", "ī": "iː", "ō": "oː", "ū": "uː"}
-_SHORT_VOWELS = {"a": "a", "e": "ɛ", "i": "ɪ", "o": "ɔ", "u": "ʊ", "y": "ʏ"}
+# ASCII-only IPA: avoids non-ASCII characters that cause ElevenLabs to silence words.
+# We sacrifice vowel-quality precision to ensure reliable word rendering.
+# The key corrections we need are: c→k (always), v→w, ae→ai, qu→kw.
+_DIPHTHONGS = {"ae": "ai", "oe": "oi", "au": "aw", "eu": "ew", "ei": "ei"}
+_DIGRAPHS = {"qu": "kw", "ph": "f", "ch": "k", "th": "t", "gn": "gn"}
+_LONG_VOWELS = {"ā": "a", "ē": "e", "ī": "i", "ō": "o", "ū": "u"}
+_SHORT_VOWELS = {"a": "a", "e": "e", "i": "i", "o": "o", "u": "u", "y": "i"}
 _CONSONANTS = {
-    "b": "b", "d": "d", "f": "f", "g": "ɡ", "h": "h", "k": "k",
+    "b": "b", "d": "d", "f": "f", "g": "g", "h": "h", "k": "k",
     "l": "l", "m": "m", "n": "n", "p": "p", "r": "r", "s": "s", "t": "t",
-    "v": "w", "j": "j", "x": "ks", "z": "dz",
+    "v": "w", "j": "j", "x": "ks", "z": "z",
 }
 
 
