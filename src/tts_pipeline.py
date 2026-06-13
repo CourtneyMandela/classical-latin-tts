@@ -13,6 +13,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
+from elevenlabs.types import PronunciationDictionaryVersionLocator
 
 
 def _load_config() -> dict:
@@ -46,9 +47,10 @@ def latin_to_speech(text: str, output_path: str) -> None:
     }
 
     if config["dict_id"]:
-        locator: dict = {"pronunciation_dictionary_id": config["dict_id"]}
-        if config["dict_version_id"]:
-            locator["version_id"] = config["dict_version_id"]
+        locator = PronunciationDictionaryVersionLocator(
+            pronunciation_dictionary_id=config["dict_id"],
+            version_id=config["dict_version_id"] or None,
+        )
         kwargs["pronunciation_dictionary_locators"] = [locator]
 
     audio = client.text_to_speech.convert(**kwargs)
