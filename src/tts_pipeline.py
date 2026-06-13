@@ -9,6 +9,7 @@ Requires .env with:
 """
 
 import os
+import unicodedata
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -35,14 +36,26 @@ def _load_config() -> dict:
     return config
 
 
+def _strip_macrons(text: str) -> str:
+    """Remove macrons and other diacritics (ā→a, ē→e, etc.) so ElevenLabs doesn't skip words."""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", text)
+        if unicodedata.category(c) != "Mn"
+    )
+
+
 def latin_to_speech(text: str, output_path: str) -> None:
     """Synthesize Latin text to an MP3 file using the cloned voice."""
     config = _load_config()
     client = ElevenLabs(api_key=config["api_key"])
 
+    # Strip macrons — ElevenLabs skips/garbles macronized Unicode; the
+    # pronunciation dictionary handles correct vowel quality via IPA anyway.
+    clean_text = _strip_macrons(text)
+
     kwargs = {
         "voice_id": config["voice_id"],
-        "text": text,
+        "text": clean_text,
         "model_id": config["model_id"],
     }
 
