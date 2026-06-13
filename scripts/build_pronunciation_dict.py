@@ -437,43 +437,41 @@ CORE_LATIN_WORDS: list[str] = [
 def transcribe_word(transcriber, word: str) -> str | None:
     """Return IPA for a Latin word, or None if transcription fails."""
     try:
-        result = transcriber.transcribe(word, macronise=False)
-        if result and result.strip():
-            return result.strip()
-    except TypeError:
-        # Some CLTK versions don't accept macronise keyword
-        try:
-            result = transcriber.transcribe(word)
-            if result and result.strip():
-                return result.strip()
-        except Exception:
-            pass
+        raw = transcriber.transcribe(word)
+        if raw and raw.strip():
+            # CLTK 2.x wraps output in [] — strip them
+            return raw.strip().strip("[]")
+    except Exception:
+        pass
+    return None
+
+
+def _load_transcriber():
+    """Return a CLTK transcriber (2.x or 1.x) or None."""
+    # CLTK 2.x
+    try:
+        from cltk.phonology.lat.phonology import LatinTranscription
+        return LatinTranscription()
+    except Exception:
+        pass
+    # CLTK 1.x
+    try:
+        from cltk.phonology.lat.transcription import Transcriber
+        return Transcriber(dialect="Classical", reconstruction="Allen")
     except Exception:
         pass
     return None
 
 
 def build_pls(words: list[str], output_path: str) -> None:
-    try:
-        from cltk.phonology.lat.transcription import Transcriber
-        transcriber = Transcriber(dialect="Classical", reconstruction="Allen")
-        use_cltk = True
-    except ImportError:
+    transcriber = _load_transcriber()
+    use_cltk = transcriber is not None
+    if not use_cltk:
         print(
-            "Warning: cltk not installed — dictionary will contain only manually curated entries.\n"
+            "Warning: cltk transcriber unavailable — dictionary will contain only manually curated entries.\n"
             "Run: pip install cltk",
             file=sys.stderr,
         )
-        use_cltk = False
-        transcriber = None
-    except Exception as e:
-        print(
-            f"Warning: cltk model data unavailable ({e}) — dictionary will contain only manually curated entries.\n"
-            "Run: python -c \"from cltk.data.fetch import FetchCorpus; c=FetchCorpus('lat'); c.import_corpus('lat_models_cltk')\"",
-            file=sys.stderr,
-        )
-        use_cltk = False
-        transcriber = None
 
     root = ET.Element("lexicon")
     root.set("version", "1.0")
