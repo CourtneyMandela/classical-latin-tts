@@ -22,7 +22,7 @@ def upload_dictionary(pls_file: str, dict_name: str) -> None:
     client = ElevenLabs(api_key=api_key)
 
     with open(pls_file, "rb") as f:
-        result = client.pronunciation_dictionaries.add_from_file(
+        result = client.pronunciation_dictionaries.create_from_file(
             file=f,
             name=dict_name,
         )
