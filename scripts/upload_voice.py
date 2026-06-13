@@ -29,6 +29,14 @@ def upload_voice(audio_dir: str, voice_name: str, description: str) -> None:
         print(f"No audio files found in {audio_dir}", file=sys.stderr)
         sys.exit(1)
 
+    # ElevenLabs IVC accepts a maximum of 25 files
+    max_files = 25
+    if len(audio_files) > max_files:
+        total = len(audio_files)
+        step = total / max_files
+        audio_files = [audio_files[int(i * step)] for i in range(max_files)]
+        print(f"Selecting {max_files} evenly-spaced files from {total} total...")
+
     print(f"Uploading {len(audio_files)} file(s) as IVC voice '{voice_name}'...")
 
     client = ElevenLabs(api_key=api_key)
